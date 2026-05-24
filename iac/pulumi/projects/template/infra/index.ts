@@ -32,7 +32,7 @@ const costCenter = config.get("costCenter") || projectName;
 const owner = config.get("owner") || "admin@example.com";
 
 // AMI検索
-const amiId = getBaseAmi({ toolchain, region });
+const amiId = pulumi.output(getBaseAmi({ toolchain, region }));
 
 // SecurityGroup作成
 const securityGroup = createProjectSecurityGroup(`${projectName}-${environment}-sg`, {
