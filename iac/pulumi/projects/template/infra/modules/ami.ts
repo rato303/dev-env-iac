@@ -11,20 +11,26 @@ export interface AmiSearchOptions {
 export async function getBaseAmi(options: AmiSearchOptions): Promise<string> {
     const { toolchain, region } = options;
 
-    // カスタムAMIを検索
-    const customAmi = await aws.ec2.getAmi({
-        filters: [
-            { name: "name", values: [`dev-env-${toolchain}-base-*`] },
-            { name: "tag:Toolchain", values: [toolchain] },
-            { name: "tag:ManagedBy", values: ["dev-env-iac"] }
-        ],
-        mostRecent: true,
-        owners: ["self"]
-    }, { async: true });
+    // カスタムAMIを検索（try-catchでラップ）
+    let customAmiId: string | undefined;
+    try {
+        const customAmi = await aws.ec2.getAmi({
+            filters: [
+                { name: "name", values: [`dev-env-${toolchain}-base-*`] },
+                { name: "tag:Toolchain", values: [toolchain] },
+                { name: "tag:ManagedBy", values: ["dev-env-iac"] }
+            ],
+            mostRecent: true,
+            owners: ["self"]
+        }, { async: true });
+        customAmiId = customAmi.id;
+    } catch (e) {
+        console.log(`ℹ No custom AMI found for ${toolchain}, proceeding to fallback`);
+    }
 
-    if (customAmi.id) {
-        console.log(`✓ Using custom AMI: ${customAmi.id} (${toolchain})`);
-        return customAmi.id;
+    if (customAmiId) {
+        console.log(`✓ Using custom AMI: ${customAmiId} (${toolchain})`);
+        return customAmiId;
     }
 
     // カスタムAMIが存在しない場合、Ubuntu base AMIを取得
