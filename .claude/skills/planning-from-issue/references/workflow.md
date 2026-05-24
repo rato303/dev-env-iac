@@ -206,31 +206,33 @@ find_similar_files() {
   local title="$1"
   local body="$2"
   local text="$title $body"
+  local repo_root
+  repo_root=$(git rev-parse --show-toplevel 2>/dev/null || echo ".")
   
   # Skillパターン
   if echo "$text" | grep -iq "skill\|スキル"; then
     echo "# Skill pattern detected"
-    find /home/ubuntu/dev-env-iac/.claude/skills -name "SKILL.md" -type f 2>/dev/null
+    find "${repo_root}/.claude/skills" -name "SKILL.md" -type f 2>/dev/null
     return
   fi
   
   # Pulumiパターン
   if echo "$text" | grep -iq "pulumi\|infrastructure\|インフラ\|IaC"; then
     echo "# Pulumi pattern detected"
-    find /home/ubuntu/dev-env-iac/iac/pulumi -name "*.ts" -type f 2>/dev/null | head -10
+    find "${repo_root}/iac/pulumi" -name "*.ts" -type f 2>/dev/null | head -10
     return
   fi
   
   # Ansibleパターン
   if echo "$text" | grep -iq "ansible\|provisioning\|プロビジョニング"; then
     echo "# Ansible pattern detected"
-    find /home/ubuntu/dev-env-iac/iac/ansible/roles -type d -mindepth 1 -maxdepth 1 2>/dev/null
+    find "${repo_root}/iac/ansible/roles" -type d -mindepth 1 -maxdepth 1 2>/dev/null
     return
   fi
   
   # デフォルト: ドキュメントファイル
   echo "# Generic pattern - checking documentation"
-  find /home/ubuntu/dev-env-iac -name "*.md" -type f -not -path "*/node_modules/*" 2>/dev/null | head -10
+  find "${repo_root}" -name "*.md" -type f -not -path "*/node_modules/*" 2>/dev/null | head -10
 }
 
 # 使用例
@@ -240,9 +242,9 @@ BODY="GitHub issueの内容から、実装の作業計画を生成するスキ�
 find_similar_files "$TITLE" "$BODY"
 # 出力:
 # # Skill pattern detected
-# /home/ubuntu/dev-env-iac/.claude/skills/creating-issue/SKILL.md
-# /home/ubuntu/dev-env-iac/.claude/skills/creating-pr/SKILL.md
-# /home/ubuntu/dev-env-iac/.claude/skills/responding-review/SKILL.md
+# {repo_root}/.claude/skills/creating-issue/SKILL.md
+# {repo_root}/.claude/skills/creating-pr/SKILL.md
+# {repo_root}/.claude/skills/responding-review/SKILL.md
 ```
 
 ## プランファイル構造テンプレート
@@ -252,57 +254,57 @@ find_similar_files "$TITLE" "$BODY"
 ```markdown
 # Issue #{number}: {title} - 実装プラン
 
-## Context
+## コンテキスト
 
 - **Issue**: #{number} - {url}
-- **Title**: {title}
-- **Labels**: {labels}
-- **State**: {state}
+- **タイトル**: {title}
+- **ラベル**: {labels}
+- **状態**: {state}
 
-### Issue Body Summary
+### Issue本文サマリー
 {issue本文の要約}
 
-## Requirements Analysis
+## 要件分析
 
-### Functional Requirements
+### 機能要件
 - [ ] {requirement 1}
 - [ ] {requirement 2}
 
-### Acceptance Criteria
+### 受け入れ基準
 - [ ] {criteria 1}
 - [ ] {criteria 2}
 
-### Constraints
+### 制約条件
 - {constraint 1}
 
-## Architecture Design
+## アーキテクチャ設計
 
-### Files to Create
-- \`path/to/file.md\` - Purpose: {reasoning}
+### 作成するファイル
+- \`path/to/file.md\` - 目的: {reasoning}
 
-### Files to Modify
-- \`path/to/existing.ts\` - Changes: {reasoning}
+### 修正するファイル
+- \`path/to/existing.ts\` - 変更内容: {reasoning}
 
-### Key Algorithms/Approaches
+### 主要なアルゴリズム/アプローチ
 - {approach 1}
 
-### Integration Points
+### 統合ポイント
 - {integration 1}
 
-## Implementation Steps
+## 実装ステップ
 
 ### Phase 1: {phase name}
-**Goal**: {goal}
+**目標**: {goal}
 
-**Tasks**:
+**タスク**:
 1. {task 1}
 2. {task 2}
 
-**Files**:
+**ファイル**:
 - \`file1.md\`
 - \`file2.ts\`
 
-**Commands**:
+**コマンド**:
 \`\`\`bash
 {command 1}
 \`\`\`
@@ -316,49 +318,49 @@ find_similar_files "$TITLE" "$BODY"
 ### Phase 4: {phase name}
 ...
 
-## Testing Strategy
+## テスト戦略
 
-### Unit Tests
+### ユニットテスト
 - {test 1}
 
-### Integration Tests
+### 統合テスト
 - {test 1}
 
-### Manual Verification
+### 手動検証
 - [ ] {verification step 1}
 - [ ] {verification step 2}
 
-## Risks and Mitigation
+## リスクと対策
 
-| Risk | Impact | Mitigation |
+| リスク | 影響 | 対策 |
 |------|--------|------------|
 | {risk 1} | {impact} | {mitigation} |
 
-## Dependencies
+## 依存関係
 
-### External Dependencies
+### 外部依存
 - {dependency 1}
 
-### Internal Dependencies
-- Related Issue: #{issue_number}
+### 内部依存
+- 関連Issue: #{issue_number}
 
-## Estimated Complexity
+## 複雑度見積もり
 
-- **Complexity**: Low / Medium / High
-- **Files Changed**: ~{number}
-- **New Files**: ~{number}
-- **Testing Effort**: Low / Medium / High
+- **複雑度**: Low / Medium / High
+- **変更ファイル数**: ~{number}
+- **新規ファイル数**: ~{number}
+- **テスト工数**: Low / Medium / High
 
-## Execution Metadata
+## 実行メタデータ
 
-- **State**: pending
-- **Current Phase**: 0
-- **Branch**: feature/{slug}
-- **Files Modified**: []
-- **Commits**: []
-- **Last Updated**: {timestamp}
+- **状態**: pending
+- **現在のフェーズ**: 0
+- **ブランチ**: feature/{slug}
+- **変更ファイル**: []
+- **コミット**: []
+- **最終更新**: {timestamp}
 
-### Phase Checklist
+### フェーズチェックリスト
 - [ ] Phase 1: {phase name}
 - [ ] Phase 2: {phase name}
 - [ ] Phase 3: {phase name}
@@ -467,21 +469,22 @@ Generic Templateに以下を追加:
 ### Issue #4 からプラン生成
 
 ```bash
-# 1. Issue情報取得（並列実行）
-gh issue view 4 --json number,title,body,labels,state,url,milestone &
+# 1. Issue情報取得（並列実行、結果を一時ファイルに保存）
+TEMP_DIR=$(mktemp -d)
+gh issue view 4 --json number,title,body,labels,state,url,milestone > "$TEMP_DIR/issue.json" &
 PID1=$!
 
-git branch --show-current &
+git branch --show-current > "$TEMP_DIR/branch.txt" &
 PID2=$!
 
-git status --short &
+git status --short > "$TEMP_DIR/status.txt" &
 PID3=$!
 
 # 待機
 wait $PID1 $PID2 $PID3
 
-# 2. Issue情報を変数に格納
-ISSUE_JSON=$(gh issue view 4 --json number,title,body,labels,state,url)
+# 2. Issue情報を変数に格納（一時ファイルから読み込み）
+ISSUE_JSON=$(cat "$TEMP_DIR/issue.json")
 ISSUE_NUM=$(echo "$ISSUE_JSON" | jq -r '.number')
 ISSUE_TITLE=$(echo "$ISSUE_JSON" | jq -r '.title')
 ISSUE_BODY=$(echo "$ISSUE_JSON" | jq -r '.body')
@@ -489,7 +492,7 @@ ISSUE_LABELS=$(echo "$ISSUE_JSON" | jq -r '[.labels[].name] | join(",")')
 ISSUE_STATE=$(echo "$ISSUE_JSON" | jq -r '.state')
 ISSUE_URL=$(echo "$ISSUE_JSON" | jq -r '.url')
 
-CURRENT_BRANCH=$(git branch --show-current)
+CURRENT_BRANCH=$(cat "$TEMP_DIR/branch.txt")
 
 # 3. エラーチェック: 本文が短すぎる
 BODY_LENGTH=${#ISSUE_BODY}
@@ -627,9 +630,9 @@ fatal: not a git repository
 **解決方法**:
 ```bash
 # リポジトリルートに移動
-cd /home/ubuntu/dev-env-iac
+cd "$(git rev-parse --show-toplevel)"
 
-# または適切なプロジェクトディレクトリに移動
+# または、gitリポジトリでない場合は適切なプロジェクトディレクトリに移動
 cd /path/to/your/project
 
 # 再度スキルを実行

@@ -135,7 +135,10 @@ tools: Read, Bash
 
 **検出方法**:
 ```bash
-gh issue view {番号} 2>&1 | grep -q "issue not found"
+# gh issue view の終了ステータスで判定（終了コード非0 = エラー）
+if ! gh issue view {番号} --json number >/dev/null 2>&1; then
+  # Issue が存在しない
+fi
 ```
 
 **エラーメッセージ**:
