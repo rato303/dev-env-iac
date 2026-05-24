@@ -104,7 +104,7 @@ gh issue edit 123 --remove-label "bug"
 gh issue create --title "タイトル" --body-file /path/to/file.md
 
 # 標準入力から本文を読み込む
-cat /path/to/file.md | gh issue create --title "タイトル" --body -
+cat /path/to/file.md | gh issue create --title "タイトル" --body-file -
 ```
 
 ## issueテンプレートの詳細
@@ -319,9 +319,18 @@ cat /path/to/file.md | gh issue create --title "タイトル" --body -
 
 #### 相対パスの処理
 
-ファイル内に相対パスがある場合:
-- 画像: `![image](./path/to/image.png)` → `![image](https://github.com/user/repo/blob/main/path/to/image.png)`
-- リンク: `[doc](./path/to/doc.md)` → `[doc](https://github.com/user/repo/blob/main/path/to/doc.md)`
+ファイル内に相対パスがある場合、リポジトリ情報を動的に取得して絶対パスに変換:
+
+```bash
+# リポジトリ情報取得
+REPO_OWNER=$(gh repo view --json owner --jq .owner.login)
+REPO_NAME=$(gh repo view --json name --jq .name)
+DEFAULT_BRANCH=$(gh repo view --json defaultBranchRef --jq .defaultBranchRef.name)
+
+# 相対パスを絶対パスに変換
+# 画像: ![image](./path/to/image.png) → ![image](https://github.com/${REPO_OWNER}/${REPO_NAME}/blob/${DEFAULT_BRANCH}/path/to/image.png)
+# リンク: [doc](./path/to/doc.md) → [doc](https://github.com/${REPO_OWNER}/${REPO_NAME}/blob/${DEFAULT_BRANCH}/path/to/doc.md)
+```
 
 #### コードブロックの処理
 

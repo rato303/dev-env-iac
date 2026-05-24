@@ -40,6 +40,7 @@ tools: Read, Bash
    - 「バグ」「エラー」「問題」→ Bug Report
    - 「機能」「追加」「実装」→ Feature Request
    - 「タスク」「TODO」「作業」→ Task
+   - 「ドキュメント」「文書」「README」→ Documentation
    - その他 → フリーフォーム
 
 ### Phase 2: issueテンプレートの適用
@@ -113,6 +114,23 @@ tools: Read, Bash
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 ```
 
+#### Documentationテンプレート
+
+```markdown
+## 変更内容
+<ドキュメントの変更概要>
+
+## 対象ファイル
+- [ ] <ファイル1>
+- [ ] <ファイル2>
+- [ ] <ファイル3>
+
+## 目的
+<なぜこのドキュメント変更が必要か>
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+```
+
 #### フリーフォームテンプレート
 
 ファイル内容をそのまま使用、末尾にフッターのみ追加：
@@ -147,9 +165,9 @@ tools: Read, Bash
    gh issue create \
      --title "<issueタイトル>" \
      --body "$(cat <<'EOF'
-   <issue本文>
-   EOF
-   )" \
+<issue本文>
+EOF
+)" \
      --label "<ラベル>"
    ```
 
