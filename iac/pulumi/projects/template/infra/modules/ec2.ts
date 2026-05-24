@@ -7,7 +7,7 @@ export interface Ec2InstanceOptions {
     projectName: string;
     environment: string;
     toolchain: string;
-    amiId: string;
+    amiId: pulumi.Input<string>;
     instanceType: string;
     subnetId: string;
     securityGroupId: string;
