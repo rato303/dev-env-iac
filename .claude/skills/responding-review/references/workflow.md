@@ -35,10 +35,10 @@ gh pr view 8 --json number,title,state,url,headRefName --jq '{number: .number, t
 gh api repos/{owner}/{repo}/pulls/<PR番号>/comments
 
 # jqで整形
-gh api repos/rato303/dev-env-iac/pulls/8/comments --jq '.[] | {id: .id, path: .path, line: .line, body: .body, user: .user.login}'
+gh api repos/{owner}/{repo}/pulls/{PR番号}/comments --jq '.[] | {id: .id, path: .path, line: .line, body: .body, user: .user.login}'
 
-# 実行例（dev-env-iacリポジトリ）
-gh api repos/rato303/dev-env-iac/pulls/8/comments --jq '.[] | {id: .id, path: .path, line: .line, body: .body[0:100], user: .user.login}'
+# 実行例（dev-env-iacリポジトリでPR #8の場合）
+gh api repos/{owner}/{repo}/pulls/8/comments --jq '.[] | {id: .id, path: .path, line: .line, body: .body[0:100], user: .user.login}'
 ```
 
 **出力例**:
@@ -60,7 +60,7 @@ gh api repos/{owner}/{repo}/pulls/{PR番号}/comments/{comment_id}/replies \
   -f body="返信内容"
 
 # 実行例
-gh api repos/rato303/dev-env-iac/pulls/8/comments/3294158924/replies \
+gh api repos/{owner}/{repo}/pulls/8/comments/3294158924/replies \
   -f body="ご指摘ありがとうございます。
 
 CLAUDE.mdの記述を修正しました。
@@ -259,7 +259,7 @@ CLAUDE.mdの記述を修正し、`Project` タグには `config/projects.yaml` �
 gh pr view 8 --json number,title,headRefName,state,url
 
 # 2. レビューコメント取得
-gh api repos/rato303/dev-env-iac/pulls/8/comments --jq '.[] | {id: .id, path: .path, line: .line, body: .body, user: .user.login}'
+gh api repos/{owner}/{repo}/pulls/8/comments --jq '.[] | {id: .id, path: .path, line: .line, body: .body, user: .user.login}'
 
 # 3. 現在のブランチ確認
 git branch --show-current
@@ -290,7 +290,7 @@ COMMIT_HASH=$(git log -1 --format=%H)
 echo $COMMIT_HASH
 
 # 9. コメント1に返信
-gh api repos/rato303/dev-env-iac/pulls/8/comments/3294158924/replies \
+gh api repos/{owner}/{repo}/pulls/8/comments/3294158924/replies \
   -f body="ご指摘ありがとうございます。
 
 CLAUDE.mdの記述を修正し、\`Project\` タグには \`config/projects.yaml\` の \`name\` フィールド（表示名）を使用することを明記しました。既存の実装がこの方針に沿っていることを確認しています。
@@ -298,7 +298,7 @@ CLAUDE.mdの記述を修正し、\`Project\` タグには \`config/projects.yaml
 対応コミット: $COMMIT_HASH"
 
 # 10. コメント2に返信
-gh api repos/rato303/dev-env-iac/pulls/8/comments/3294158925/replies \
+gh api repos/{owner}/{repo}/pulls/8/comments/3294158925/replies \
   -f body="ご指摘ありがとうございます。
 
 タグ名の混在を解消するため、\`ec2.ts\` の \`ProvisionedBy\` を \`ManagedBy\` に統一しました。これにより、プロジェクト全体でCLAUDE.mdで定義した規約に従ったタグ名が使用されます。
@@ -391,7 +391,7 @@ HTTP 422: Validation Failed
 **何が起きたか**:
 PR #8のレビュー対応中に、以下のコマンドを実行:
 ```bash
-gh api --method PATCH repos/rato303/dev-env-iac/pulls/comments/3294158924 \
+gh api --method PATCH repos/{owner}/{repo}/pulls/comments/3294158924 \
   -f body="ご指摘ありがとうございます。対応しました。"
 ```
 
@@ -409,7 +409,7 @@ gh api --method PATCH repos/rato303/dev-env-iac/pulls/comments/3294158924 \
 
 **正しいコマンド**:
 ```bash
-gh api repos/rato303/dev-env-iac/pulls/8/comments/3294158924/replies \
+gh api repos/{owner}/{repo}/pulls/8/comments/3294158924/replies \
   -f body="ご指摘ありがとうございます。対応しました。"
 ```
 

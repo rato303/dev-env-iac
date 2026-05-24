@@ -15,8 +15,8 @@ tools: Read, Bash, Edit
 
 以下のコマンドを**並列実行**してPRの状態とレビューコメントを取得します：
 
-1. `gh pr view <PR番号> --json number,title,state,url,headRefName` - PR情報を取得
-2. `gh api repos/{owner}/{repo}/pulls/<PR番号>/comments` - レビューコメント一覧を取得
+1. `gh pr view {PR番号} --json number,title,state,url,headRefName` - PR情報を取得
+2. `gh api repos/{owner}/{repo}/pulls/{PR番号}/comments` - レビューコメント一覧を取得
 3. `git branch --show-current` - 現在のブランチ名を確認
 
 **出力**:
@@ -130,7 +130,7 @@ PRのheadRefNameと現在のブランチ名を比較
 現在のブランチ（<現在のブランチ>）がPRのブランチ（<PRのブランチ>）と一致しません。
 
 以下のコマンドで正しいブランチに切り替えてください:
-  git checkout <PRのブランチ>
+  gh pr checkout {PR番号}
 ```
 
 ### コミットがプッシュできない
