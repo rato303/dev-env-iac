@@ -28,7 +28,7 @@ up: login-backend
 
 down:
 	@echo "==> Pausing instances in $(STACK)..."
-	@pulumi stack --stack $(STACK) output instanceId | xargs -I {} aws ec2 stop-instances --instance-ids {}
+	@pulumi stack --stack $(STACK) output instanceId | xargs -r -I {} aws ec2 stop-instances --instance-ids {}
 
 destroy: login-backend
 	@echo "==> Destroying $(PROJECT) in $(STACK)..."
