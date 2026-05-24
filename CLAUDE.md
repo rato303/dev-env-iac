@@ -98,7 +98,7 @@ issue      from-issue  plan                  pr         review
 | `responding-review` | 「レビュー指摘に対応」「指摘を修正」 | レビュー対応 |
 
 **プランファイル管理**:
-- 保存場所: `~/.claude/plans/issue-{番号}-{slug}.md`
+- 保存場所: `~/.claude/plans/issue-{番号}-{slug}.md`（ユーザーホーム：個人開発者向けプロジェクトのため、案件ごとに独立した開発環境を想定）
 - メタデータ: State (pending/in-progress/completed), Current Phase (0-4), Files Modified, Commits
 - 実行状態を追跡し、中断・再開が可能
 
@@ -118,7 +118,7 @@ issue      from-issue  plan                  pr         review
 - {ファイル名}: {変更内容}
 - {ファイル名}: {変更内容}
 
-Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
 **プレフィックス**:
@@ -132,7 +132,7 @@ Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 | `test:` | テスト追加・修正 | `test: AMI検索のユニットテスト追加` |
 
 **Co-Authored-Byタグ**:
-- **必須**: すべてのコミットに `Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>` を追加
+- **必須**: すべてのコミットに `Co-Authored-By: Claude <noreply@anthropic.com>` を追加
 - Claude Codeが生成したコミットであることを明示
 
 **良い例**:
@@ -143,7 +143,7 @@ feat: CLAUDE.mdに開発ワークフロー規約を追加
 - CLAUDE.md: コミット規約とPR規約のセクション追加
 - CLAUDE.md: スキル使用ガイドの追加
 
-Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
 **悪い例**:
@@ -186,8 +186,8 @@ PRレビュー指摘への対応は `responding-review` スキルで自動化さ
 1. **レビューコメント取得**: `gh api repos/{owner}/{repo}/pulls/{PR}/comments`
 2. **ファイル修正**: 指摘内容に従ってファイルを修正
 3. **コミット作成**: `fix: レビュー指摘対応 - {要約}`
-4. **コメント返信**: 各レビューコメントに返信を投稿
-5. **スレッドResolve**: GraphQL mutationでスレッドをResolve
+4. **コメント返信**: 各レビューコメントに返信を投稿（`gh api repos/{owner}/{repo}/pulls/{PR}/comments/{comment_id}/replies`）
+5. **スレッドResolve**: GraphQL mutationでスレッドをResolve（`gh api graphql -f id="<thread_id>" -f query='mutation($id: ID!) { resolveReviewThread(input: {threadId: $id}) { thread { id isResolved } } }'`）
 
 **返信フォーマット**:
 ```markdown
