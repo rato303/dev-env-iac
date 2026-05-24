@@ -64,7 +64,6 @@ export function createDevInstance(
             Toolchain: options.toolchain,
             CostCenter: options.costCenter,
             Owner: options.owner,
-            ProvisionedAt: new Date().toISOString(),
 
             // AMIトラッキング
             BaseAmiId: options.amiId
