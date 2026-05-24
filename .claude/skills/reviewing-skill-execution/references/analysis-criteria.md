@@ -52,7 +52,28 @@
 **改善提案**:
 ```markdown
 **Before**:
-```
+```xml
 <function_calls>
 <invoke name="Bash">
-<parameter name="command">gh issue view 22 --json number,title
+<parameter name="command">gh issue view 22 --json number,title</parameter>
+</invoke>
+</function_calls>
+<function_calls>
+<invoke name="Bash">
+<parameter name="command">git branch --show-current</parameter>
+</invoke>
+</function_calls>
+```
+
+**After**:
+```xml
+<function_calls>
+<invoke name="Bash">
+<parameter name="command">gh issue view 22 --json number,title</parameter>
+</invoke>
+<invoke name="Bash">
+<parameter name="command">git branch --show-current</parameter>
+</invoke>
+</function_calls>
+```
+```

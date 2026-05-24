@@ -2,7 +2,7 @@
 name: reviewing-skill-execution
 description: 各スキル実行後に、そのスキルの改善点（トークン使用量、実行効率、ユーザー体験）を分析します。ユーザーが「スキルをレビュー」「改善点を確認」「トークンの無駄遣いチェック」と言及した場合、または明示的にスキル実行の品質を評価したい場合に使用します。
 version: 1.0.0
-tools: Read
+tools: Read, Bash, Write
 ---
 
 # スキル実行レビュースキル
