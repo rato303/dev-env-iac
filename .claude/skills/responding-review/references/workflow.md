@@ -599,7 +599,26 @@ THREADS_JSON=$(gh api graphql -f owner="$OWNER" -f repo="$REPO" -F pr="$PR_NUMBE
   }
 ')
 
-# 2. 各コメントに返信 + Resolve
+# 2. comment ID → thread ID のマッピングをファイルに保存（堅牢な方法）
+MAPPING_FILE=$(mktemp)
+
+# エラーハンドリング: mktemp失敗時
+if [ ! -f "$MAPPING_FILE" ]; then
+  echo "Error: Failed to create temporary mapping file"
+  exit 1
+fi
+
+# クリーンアップをtrapで保証
+trap "rm -f '$MAPPING_FILE'" EXIT ERR
+
+# マッピング生成: "comment_id:thread_id" 形式
+echo "$THREADS_JSON" | jq -r '.data.repository.pullRequest.reviewThreads.nodes[] | "\(.comments.nodes[0].databaseId):\(.id)"' > "$MAPPING_FILE"
+
+# マッピングファイルの内容を確認（デバッグ用、本番では削除可能）
+# echo "DEBUG: Mapping file contents:"
+# cat "$MAPPING_FILE"
+
+# 3. 各コメントに返信 + Resolve
 COMMIT_HASH=$(git log -1 --format=%H)
 RESOLVED_COUNT=0
 FAILED_COUNT=0
@@ -618,12 +637,8 @@ for COMMENT_ID in "${COMMENT_IDS[@]}"; do
   if [ $? -eq 0 ]; then
     echo "  Reply posted successfully"
     
-    # thread IDを取得
-    THREAD_ID=$(echo "$THREADS_JSON" | jq -r --arg cid "$COMMENT_ID" '
-      .data.repository.pullRequest.reviewThreads.nodes[] |
-      select(.comments.nodes[].databaseId == ($cid | tonumber)) |
-      .id
-    ')
+    # thread IDをファイルから取得（堅牢な方法）
+    THREAD_ID=$(grep "^$COMMENT_ID:" "$MAPPING_FILE" | cut -d: -f2)
     
     if [ -n "$THREAD_ID" ]; then
       # Resolve実行
@@ -646,7 +661,7 @@ for COMMENT_ID in "${COMMENT_IDS[@]}"; do
         FAILED_COUNT=$((FAILED_COUNT + 1))
       fi
     else
-      echo "  Thread ID not found"
+      echo "  Warning: Thread ID not found for comment $COMMENT_ID"
       FAILED_COUNT=$((FAILED_COUNT + 1))
     fi
   else
@@ -657,7 +672,7 @@ for COMMENT_ID in "${COMMENT_IDS[@]}"; do
   echo ""
 done
 
-# 3. サマリー表示
+# 4. サマリー表示
 echo "=========================================="
 echo "Review response completed"
 echo "=========================================="
@@ -666,6 +681,8 @@ echo "Threads resolved: $RESOLVED_COUNT"
 echo "Failed: $FAILED_COUNT"
 echo ""
 echo "PR URL: https://github.com/$OWNER/$REPO/pull/$PR_NUMBER"
+
+# クリーンアップは trap で自動実行される
 ```
 
 ### エラーハンドリング
@@ -704,12 +721,198 @@ resolve_thread "$THREAD_ID"  # 常に成功
 
 **対策**:
 ```bash
+# マッピングファイルからthread IDを取得
+THREAD_ID=$(grep "^$COMMENT_ID:" "$MAPPING_FILE" | cut -d: -f2)
+
+if [ -z "$THREAD_ID" ]; then
+  echo "Warning: Thread ID not found for comment $COMMENT_ID"
+  echo "  Possible causes:"
+  echo "  - Comment is not a review comment"
+  echo "  - Comment was deleted"
+  echo "  - GraphQL API returned incomplete data"
+  # 処理を継続（次のコメントへ）
+  continue
+fi
+```
+
+#### マッピングファイル作成失敗
+
+**症状**: `mktemp` コマンドが失敗する
+
+**原因**: `/tmp` ディレクトリへの書き込み権限がない、ディスク容量不足
+
+**対策**:
+```bash
+MAPPING_FILE=$(mktemp)
+
+if [ ! -f "$MAPPING_FILE" ]; then
+  echo "Error: Failed to create temporary mapping file"
+  echo "  Check /tmp directory permissions and disk space"
+  exit 1
+fi
+```
+
+#### クリーンアップの確実な実行
+
+**対策**: `trap` でEXITとERR時にクリーンアップを保証
+
+```bash
+# スクリプト開始時に設定
+trap "rm -f '$MAPPING_FILE'" EXIT ERR
+
+# スクリプト終了時（正常/異常問わず）に自動実行される
+```
+
+**検証**:
+```bash
+# 一時ファイルが残っていないことを確認
+ls /tmp/tmp.* 2>/dev/null | wc -l
+# 出力が0ならクリーンアップ成功
+```
+
+**対策**:
+```bash
 if [ -z "$THREAD_ID" ]; then
   echo "Warning: Thread ID not found for comment $COMMENT_ID"
   echo "This may be a regular PR comment, not a review comment"
   continue
 fi
 ```
+
+### 代替実装案
+
+上記の統合フローでは**ファイル経由マッピング（アルゴリズム2）**を使用していますが、他の実装方法も紹介します。
+
+#### 代替案1: 連想配列（bash 4.0以降）
+
+```bash
+#!/bin/bash
+
+# 設定
+OWNER="rato303"
+REPO="dev-env-iac"
+PR_NUMBER=12
+COMMENT_IDS=(3294272425 3294272429 3294272431 3294272432)
+
+# 1. thread ID一覧を取得
+THREADS_JSON=$(gh api graphql -f owner="$OWNER" -f repo="$REPO" -F pr="$PR_NUMBER" -f query='...')
+
+# 2. 連想配列でマッピング作成
+declare -A COMMENT_TO_THREAD
+
+# 注意: while read はパイプライン経由のためサブシェルになり、連想配列が親シェルに反映されない
+# 回避策: process substitution を使用
+while IFS=: read -r comment_id thread_id; do
+  COMMENT_TO_THREAD[$comment_id]=$thread_id
+done < <(echo "$THREADS_JSON" | jq -r '.data.repository.pullRequest.reviewThreads.nodes[] | "\(.comments.nodes[0].databaseId):\(.id)"')
+
+# 3. 各コメントに返信 + Resolve
+COMMIT_HASH=$(git log -1 --format=%H)
+
+for COMMENT_ID in "${COMMENT_IDS[@]}"; do
+  echo "Processing comment $COMMENT_ID..."
+  
+  # 返信投稿
+  gh api repos/$OWNER/$REPO/pulls/$PR_NUMBER/comments/$COMMENT_ID/replies -f body="..."
+  
+  # thread IDを連想配列から取得
+  THREAD_ID="${COMMENT_TO_THREAD[$COMMENT_ID]}"
+  
+  if [ -n "$THREAD_ID" ]; then
+    # Resolve実行
+    gh api graphql -f id="$THREAD_ID" -f query='...'
+  else
+    echo "  Warning: Thread ID not found for comment $COMMENT_ID"
+  fi
+done
+```
+
+**メリット**:
+- bashネイティブのデータ構造
+- ファイルI/O不要
+
+**デメリット**:
+- bash 4.0以降が必要
+- パイプライン経由のwhileではサブシェル問題が発生（process substitution `< <(...)` で回避）
+- デバッグが困難（連想配列の内容を確認しにくい）
+
+#### 代替案2: 個別にthread ID取得
+
+```bash
+#!/bin/bash
+
+# 設定
+OWNER="rato303"
+REPO="dev-env-iac"
+PR_NUMBER=12
+COMMENT_IDS=(3294272425 3294272429 3294272431 3294272432)
+
+# 各コメントに返信 + Resolve
+COMMIT_HASH=$(git log -1 --format=%H)
+
+for COMMENT_ID in "${COMMENT_IDS[@]}"; do
+  echo "Processing comment $COMMENT_ID..."
+  
+  # 返信投稿
+  gh api repos/$OWNER/$REPO/pulls/$PR_NUMBER/comments/$COMMENT_ID/replies -f body="..."
+  
+  # comment IDごとにthread IDを個別に取得
+  THREAD_ID=$(gh api graphql -f owner="$OWNER" -f repo="$REPO" -F pr="$PR_NUMBER" -f query='
+    query($owner: String!, $repo: String!, $pr: Int!) {
+      repository(owner: $owner, name: $repo) {
+        pullRequest(number: $pr) {
+          reviewThreads(first: 50) {
+            nodes {
+              id
+              comments(first: 10) {
+                nodes {
+                  databaseId
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ' | jq -r --argjson cid "$COMMENT_ID" '.data.repository.pullRequest.reviewThreads.nodes[] | select(.comments.nodes[].databaseId == $cid) | .id')
+  
+  if [ -n "$THREAD_ID" ]; then
+    # Resolve実行
+    gh api graphql -f id="$THREAD_ID" -f query='...'
+  else
+    echo "  Warning: Thread ID not found for comment $COMMENT_ID"
+  fi
+done
+```
+
+**メリット**:
+- シンプルで理解しやすい
+- 変数スコープ問題を完全に回避
+- 各コメント処理が独立している
+
+**デメリット**:
+- API呼び出し回数が増える（comment数回 + 1回）
+- レート制限に注意が必要
+- 実行時間が長くなる
+
+#### 推奨アプローチ
+
+**ファイル経由マッピング（アルゴリズム2）** を推奨します。
+
+**理由**:
+- 堅牢性が最も高い（サブシェル問題を完全に回避）
+- API呼び出し回数は最小（1回のみ）
+- デバッグが容易（マッピングファイルを検査可能）
+- bashのバージョンに依存しない
+- 標準ツール（mktemp, grep, cut）のみで実装可能
+
+### 修正履歴
+
+- **2026-05-24**: シェル変数スコープ問題を修正（Issue #15）
+  - `echo "$THREADS_JSON" | jq ...` による変数スコープ問題を解決
+  - ファイル経由マッピング（mktemp + grep/cut）に変更
+  - エラーハンドリング強化（mktemp失敗、thread ID未発見）
+  - trapでクリーンアップを保証
 
 ### 参考リンク
 
