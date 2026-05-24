@@ -25,7 +25,7 @@
 
 ### 2. タグベースのリソース管理
 すべてのリソースに以下のタグを必ず付与：
-- `Project`: 案件識別子（config/projects.yamlのキー）
+- `Project`: プロジェクト名（config/projects.yamlのnameフィールド）
 - `Environment`: 環境（dev/staging/prod）
 - `Toolchain`: ツールチェーン種別（web-dev/jvm-dev）
 - `CostCenter`: コスト配分先
