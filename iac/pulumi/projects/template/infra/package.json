@@ -1,0 +1,17 @@
+{
+  "name": "dev-env-template",
+  "version": "1.0.0",
+  "description": "Development environment template with Pulumi",
+  "main": "index.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@pulumi/pulumi": "^3.113.0",
+    "@pulumi/aws": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18",
+    "typescript": "^5.0.0"
+  }
+}
