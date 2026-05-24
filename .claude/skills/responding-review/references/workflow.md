@@ -611,8 +611,8 @@ fi
 # クリーンアップをtrapで保証
 trap "rm -f '$MAPPING_FILE'" EXIT ERR
 
-# マッピング生成: "comment_id:thread_id" 形式
-echo "$THREADS_JSON" | jq -r '.data.repository.pullRequest.reviewThreads.nodes[] | "\(.comments.nodes[0].databaseId):\(.id)"' > "$MAPPING_FILE"
+# マッピング生成: "comment_id:thread_id" 形式（スレッド内の全コメントを対象）
+echo "$THREADS_JSON" | jq -r '.data.repository.pullRequest.reviewThreads.nodes[] | .id as $tid | .comments.nodes[] | "\(.databaseId):\($tid)"' > "$MAPPING_FILE"
 
 # マッピングファイルの内容を確認（デバッグ用、本番では削除可能）
 # echo "DEBUG: Mapping file contents:"
@@ -804,7 +804,7 @@ declare -A COMMENT_TO_THREAD
 # 回避策: process substitution を使用
 while IFS=: read -r comment_id thread_id; do
   COMMENT_TO_THREAD[$comment_id]=$thread_id
-done < <(echo "$THREADS_JSON" | jq -r '.data.repository.pullRequest.reviewThreads.nodes[] | "\(.comments.nodes[0].databaseId):\(.id)"')
+done < <(echo "$THREADS_JSON" | jq -r '.data.repository.pullRequest.reviewThreads.nodes[] | .id as $tid | .comments.nodes[] | "\(.databaseId):\($tid)"')
 
 # 3. 各コメントに返信 + Resolve
 COMMIT_HASH=$(git log -1 --format=%H)
