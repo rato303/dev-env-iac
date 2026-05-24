@@ -53,7 +53,7 @@ export function createDevInstance(
             // 既存タグ（instance-provisioningから継承）
             Name: options.instanceName,
             ProvisioningRepositoryVersion: gitCommitHash,
-            ProvisionedBy: "dev-env-iac",
+            ManagedBy: "dev-env-iac",
             Role: options.iamInstanceProfile,
             SSMEnabled: "true",
             SSMManaged: "true",
