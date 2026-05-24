@@ -12,29 +12,79 @@ DEFAULT_CACHE_TIMEOUT="28800"  # デフォルト値
 
 # 使用方法表示
 usage() {
-    echo "使用方法: git-switch-user <github-id> [--timeout <seconds>]"
+    echo "使用方法: git-switch-user <github-id> [OPTIONS]"
     echo ""
-    echo "引数:"
-    echo "  <github-id>              GitHub ID（Secrets Manager の識別子）"
+    echo "Options:"
+    echo "  --name <name>            Git user.name（トークン直接指定時は必須）"
+    echo "  --email <email>          Git user.email（トークン直接指定時は必須）"
+    echo "  --token <token>          GitHub Personal Access Token（直接指定）"
     echo "  --timeout <seconds>      クレデンシャルキャッシュの有効期限（秒）"
     echo "                           デフォルト: ${DEFAULT_CACHE_TIMEOUT}秒 ($(echo "${DEFAULT_CACHE_TIMEOUT} / 3600" | bc)時間)"
+    echo "  --from-secrets           明示的にSecrets Managerから取得（デフォルト動作）"
+    echo "  -h, --help               ヘルプ表示"
+    echo ""
+    echo "動作モード:"
+    echo "  1. --token指定あり: トークンを直接使用（--name, --emailも必須）"
+    echo "  2. --token指定なし: Secrets Managerから取得（従来の動作）"
     echo ""
     echo "例:"
-    echo "  git-switch-user personal"
-    echo "  git-switch-user work --timeout 3600"
-    echo "  git-switch-user personal --timeout 60    # テスト用（60秒）"
+    echo "  # Secrets Managerモード（従来）"
+    echo "  git-switch-user rato303"
+    echo "  git-switch-user rato303 --timeout 3600"
     echo ""
-    echo "GitHub ID は Secrets Manager に登録されている識別子です"
-    echo "シークレット名: ${SECRET_PREFIX}/<github-id>"
+    echo "  # トークン直接指定モード（推奨）"
+    echo "  git-switch-user rato303 \\"
+    echo "    --name \"Your Name\" \\"
+    echo "    --email \"your.email@example.com\" \\"
+    echo "    --token \"ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxx\""
+    echo ""
+    echo "GitHub ID: Secrets Manager の識別子、またはユーザー識別用ラベル"
+    echo "シークレット名（Secrets Managerモード時）: ${SECRET_PREFIX}/<github-id>"
     exit 1
 }
 
 # 引数解析
 GITHUB_ID=""
 CACHE_TIMEOUT="${DEFAULT_CACHE_TIMEOUT}"
+TOKEN_DIRECT=""
+NAME_DIRECT=""
+EMAIL_DIRECT=""
+USE_SECRETS_MANAGER=true
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
+        --token)
+            if [ -z "$2" ]; then
+                echo "✗ エラー: --token には値を指定してください"
+                echo ""
+                usage
+            fi
+            TOKEN_DIRECT="$2"
+            USE_SECRETS_MANAGER=false
+            shift 2
+            ;;
+        --name)
+            if [ -z "$2" ]; then
+                echo "✗ エラー: --name には値を指定してください"
+                echo ""
+                usage
+            fi
+            NAME_DIRECT="$2"
+            shift 2
+            ;;
+        --email)
+            if [ -z "$2" ]; then
+                echo "✗ エラー: --email には値を指定してください"
+                echo ""
+                usage
+            fi
+            EMAIL_DIRECT="$2"
+            shift 2
+            ;;
+        --from-secrets)
+            USE_SECRETS_MANAGER=true
+            shift
+            ;;
         --timeout)
             if [ -z "$2" ] || ! [[ "$2" =~ ^[0-9]+$ ]]; then
                 echo "✗ エラー: --timeout には正の整数を指定してください"
@@ -43,6 +93,9 @@ while [[ $# -gt 0 ]]; do
             fi
             CACHE_TIMEOUT="$2"
             shift 2
+            ;;
+        -h|--help)
+            usage
             ;;
         -*)
             echo "✗ エラー: 不明なオプション: $1"
@@ -74,73 +127,109 @@ echo "  GitHub ユーザー切り替え"
 echo "=================================================="
 echo ""
 echo "GitHub ID: ${GITHUB_ID}"
-echo "シークレット名: ${SECRET_NAME}"
+
+if [ "${USE_SECRETS_MANAGER}" = true ]; then
+    echo "モード: Secrets Manager"
+    echo "シークレット名: ${SECRET_NAME}"
+else
+    echo "モード: トークン直接指定"
+fi
 echo ""
 
-# AWS CLI の確認
-if ! command -v aws &> /dev/null; then
-    echo "✗ エラー: AWS CLI が見つかりません"
+# トークン直接指定モードの場合
+if [ "${USE_SECRETS_MANAGER}" = false ]; then
+    # 必須パラメータチェック
+    if [ -z "${TOKEN_DIRECT}" ] || [ -z "${NAME_DIRECT}" ] || [ -z "${EMAIL_DIRECT}" ]; then
+        echo "✗ エラー: --token を使用する場合は --name と --email も必須です"
+        echo ""
+        usage
+    fi
+
+    NAME="${NAME_DIRECT}"
+    EMAIL="${EMAIL_DIRECT}"
+    TOKEN="${TOKEN_DIRECT}"
+
+    echo "直接指定されたトークンを使用します"
+    echo "✓ トークン情報を設定しました"
     echo ""
-    echo "AWS CLI をインストールしてください"
-    exit 1
+
+    # セキュリティ警告
+    echo "⚠ セキュリティに関する注意:"
+    echo "  - トークンはシェル履歴に残る可能性があります"
+    echo "  - セッション終了後はキャッシュがクリアされます (${CACHE_TIMEOUT}秒後)"
+    echo "  - トークンは credential-cache に一時保存されます"
+    echo ""
+
+# Secrets Managerモード
+else
+    # AWS CLI の確認
+    if ! command -v aws &> /dev/null; then
+        echo "✗ エラー: AWS CLI が見つかりません"
+        echo ""
+        echo "AWS CLI をインストールしてください"
+        exit 1
+    fi
+
+    # jq の確認
+    if ! command -v jq &> /dev/null; then
+        echo "✗ エラー: jq コマンドが見つかりません"
+        echo ""
+        echo "jq をインストールしてください"
+        exit 1
+    fi
+
+    # Secrets Manager からシークレットを取得
+    echo "Secrets Manager からトークン情報を取得中..."
+    set +e
+    SECRET_JSON=$(aws secretsmanager get-secret-value \
+        --secret-id "${SECRET_NAME}" \
+        --region "${AWS_REGION}" \
+        --query SecretString \
+        --output text 2>&1)
+    RESULT=$?
+    set -e
+
+    if [ ${RESULT} -ne 0 ]; then
+        echo ""
+        echo "✗ エラー: Secrets Manager からシークレットを取得できませんでした"
+        echo ""
+        echo "${SECRET_JSON}"
+        echo ""
+        echo "考えられる原因:"
+        echo "  1. シークレット '${SECRET_NAME}' が存在しない"
+        echo "  2. IAM 権限が不足している"
+        echo "  3. ネットワークエラー"
+        echo ""
+        echo "シークレット一覧を確認するには:"
+        echo "  aws secretsmanager list-secrets --region ${AWS_REGION} | grep ${SECRET_PREFIX}"
+        echo ""
+        echo "ヒント: トークンを直接指定する場合は --token オプションを使用してください"
+        echo "  git-switch-user ${GITHUB_ID} --name \"Your Name\" --email \"your@email.com\" --token \"ghp_xxx\""
+        exit 1
+    fi
+
+    # JSON をパース
+    NAME=$(echo "${SECRET_JSON}" | jq -r '.name // empty' 2>/dev/null)
+    EMAIL=$(echo "${SECRET_JSON}" | jq -r '.email // empty' 2>/dev/null)
+    TOKEN=$(echo "${SECRET_JSON}" | jq -r '.token // empty' 2>/dev/null)
+
+    # 必須フィールドの確認
+    if [ -z "${NAME}" ] || [ -z "${EMAIL}" ] || [ -z "${TOKEN}" ]; then
+        echo ""
+        echo "✗ エラー: シークレットの JSON 構造が不正です"
+        echo ""
+        echo "必須フィールド: name, email, token"
+        echo ""
+        echo "現在の値:"
+        echo "  name:  ${NAME:-<空>}"
+        echo "  email: ${EMAIL:-<空>}"
+        echo "  token: ${TOKEN:+<設定済み>}${TOKEN:-<空>}"
+        exit 1
+    fi
+
+    echo "✓ トークン情報を取得しました"
+    echo ""
 fi
-
-# jq の確認
-if ! command -v jq &> /dev/null; then
-    echo "✗ エラー: jq コマンドが見つかりません"
-    echo ""
-    echo "jq をインストールしてください"
-    exit 1
-fi
-
-# Secrets Manager からシークレットを取得
-echo "Secrets Manager からトークン情報を取得中..."
-set +e
-SECRET_JSON=$(aws secretsmanager get-secret-value \
-    --secret-id "${SECRET_NAME}" \
-    --region "${AWS_REGION}" \
-    --query SecretString \
-    --output text 2>&1)
-RESULT=$?
-set -e
-
-if [ ${RESULT} -ne 0 ]; then
-    echo ""
-    echo "✗ エラー: Secrets Manager からシークレットを取得できませんでした"
-    echo ""
-    echo "${SECRET_JSON}"
-    echo ""
-    echo "考えられる原因:"
-    echo "  1. シークレット '${SECRET_NAME}' が存在しない"
-    echo "  2. IAM 権限が不足している"
-    echo "  3. ネットワークエラー"
-    echo ""
-    echo "シークレット一覧を確認するには:"
-    echo "  aws secretsmanager list-secrets --region ${AWS_REGION} | grep ${SECRET_PREFIX}"
-    exit 1
-fi
-
-# JSON をパース
-NAME=$(echo "${SECRET_JSON}" | jq -r '.name // empty' 2>/dev/null)
-EMAIL=$(echo "${SECRET_JSON}" | jq -r '.email // empty' 2>/dev/null)
-TOKEN=$(echo "${SECRET_JSON}" | jq -r '.token // empty' 2>/dev/null)
-
-# 必須フィールドの確認
-if [ -z "${NAME}" ] || [ -z "${EMAIL}" ] || [ -z "${TOKEN}" ]; then
-    echo ""
-    echo "✗ エラー: シークレットの JSON 構造が不正です"
-    echo ""
-    echo "必須フィールド: name, email, token"
-    echo ""
-    echo "現在の値:"
-    echo "  name:  ${NAME:-<空>}"
-    echo "  email: ${EMAIL:-<空>}"
-    echo "  token: ${TOKEN:+<設定済み>}${TOKEN:-<空>}"
-    exit 1
-fi
-
-echo "✓ トークン情報を取得しました"
-echo ""
 
 # Git グローバル設定を更新
 echo "Git ユーザー設定を更新中..."

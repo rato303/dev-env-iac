@@ -1,0 +1,12 @@
+config:
+  aws:region: ap-northeast-1
+  dev-env-template:projectName: client-a
+  dev-env-template:environment: dev
+  dev-env-template:toolchain: web-dev
+  dev-env-template:vpcId: vpc-xxxxxxxxx
+  dev-env-template:subnetId: subnet-xxxxxxxxx
+  dev-env-template:instanceType: t3.medium
+  dev-env-template:volumeSize: "60"
+  dev-env-template:roleType: basic
+  dev-env-template:costCenter: client-a
+  dev-env-template:owner: user@example.com
