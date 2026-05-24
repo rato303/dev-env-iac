@@ -11,20 +11,20 @@
 parse_metadata() {
   local plan_file="$1"
   
-  # 状態を取得
-  STATE=$(grep -A 20 "^## 実行メタデータ" "$plan_file" | grep "^\- \*\*状態\*\*:" | sed 's/.*状態\*\*:\s*//' | tr -d ' ')
+  # 状態を取得（メタデータセクションをフェーズチェックリストまで動的抽出）
+  STATE=$(awk '/^## 実行メタデータ/,/^### フェーズチェックリスト/' "$plan_file" | grep "^\- \*\*状態\*\*:" | sed 's/.*状態\*\*:\s*//' | tr -d ' ')
   
   # 現在のフェーズを取得
-  CURRENT_PHASE=$(grep -A 20 "^## 実行メタデータ" "$plan_file" | grep "^\- \*\*現在のフェーズ\*\*:" | sed 's/.*現在のフェーズ\*\*:\s*//' | tr -d ' ')
+  CURRENT_PHASE=$(awk '/^## 実行メタデータ/,/^### フェーズチェックリスト/' "$plan_file" | grep "^\- \*\*現在のフェーズ\*\*:" | sed 's/.*現在のフェーズ\*\*:\s*//' | tr -d ' ')
   
   # ブランチ名を取得
-  BRANCH=$(grep -A 20 "^## 実行メタデータ" "$plan_file" | grep "^\- \*\*ブランチ\*\*:" | sed 's/.*ブランチ\*\*:\s*//' | tr -d ' ')
+  BRANCH=$(awk '/^## 実行メタデータ/,/^### フェーズチェックリスト/' "$plan_file" | grep "^\- \*\*ブランチ\*\*:" | sed 's/.*ブランチ\*\*:\s*//' | tr -d ' ')
   
   # 変更ファイルを取得
-  FILES_MODIFIED=$(grep -A 20 "^## 実行メタデータ" "$plan_file" | grep "^\- \*\*変更ファイル\*\*:" | sed 's/.*変更ファイル\*\*:\s*//')
+  FILES_MODIFIED=$(awk '/^## 実行メタデータ/,/^### フェーズチェックリスト/' "$plan_file" | grep "^\- \*\*変更ファイル\*\*:" | sed 's/.*変更ファイル\*\*:\s*//')
   
   # コミットを取得
-  COMMITS=$(grep -A 20 "^## 実行メタデータ" "$plan_file" | grep "^\- \*\*コミット\*\*:" | sed 's/.*コミット\*\*:\s*//')
+  COMMITS=$(awk '/^## 実行メタデータ/,/^### フェーズチェックリスト/' "$plan_file" | grep "^\- \*\*コミット\*\*:" | sed 's/.*コミット\*\*:\s*//')
   
   echo "State: $STATE"
   echo "Phase: $CURRENT_PHASE"
@@ -84,10 +84,15 @@ extract_files() {
   echo "$phase_content" | awk '/^\*\*ファイル\*\*:/,/^\*\*コマンド\*\*:/' | grep '^\- '
 }
 
-# Commands を抽出
+# Commands を抽出（コードブロック記法を除外）
 extract_commands() {
   local phase_content="$1"
-  echo "$phase_content" | awk '/^\*\*コマンド\*\*:/,/^### Phase [0-9]:/' | sed '1d;$d'
+  echo "$phase_content" | awk '
+    /^\*\*コマンド\*\*:/ { in_section=1; next }
+    /^### Phase [0-9]:/ { exit }
+    in_section && /^```/ { in_code=!in_code; next }
+    in_section && in_code { print }
+  '
 }
 
 # 使用例
@@ -292,9 +297,9 @@ if [ ! -f "$PLAN_FILE" ]; then
 fi
 
 # 2. メタデータ解析
-STATE=$(grep -A 20 "^## 実行メタデータ" "$PLAN_FILE" | grep "^\- \*\*状態\*\*:" | sed 's/.*状態\*\*:\s*//' | tr -d ' ')
-CURRENT_PHASE=$(grep -A 20 "^## 実行メタデータ" "$PLAN_FILE" | grep "^\- \*\*現在のフェーズ\*\*:" | sed 's/.*現在のフェーズ\*\*:\s*//' | tr -d ' ')
-BRANCH=$(grep -A 20 "^## 実行メタデータ" "$PLAN_FILE" | grep "^\- \*\*ブランチ\*\*:" | sed 's/.*ブランチ\*\*:\s*//' | tr -d ' ')
+STATE=$(awk '/^## 実行メタデータ/,/^### フェーズチェックリスト/' "$PLAN_FILE" | grep "^\- \*\*状態\*\*:" | sed 's/.*状態\*\*:\s*//' | tr -d ' ')
+CURRENT_PHASE=$(awk '/^## 実行メタデータ/,/^### フェーズチェックリスト/' "$PLAN_FILE" | grep "^\- \*\*現在のフェーズ\*\*:" | sed 's/.*現在のフェーズ\*\*:\s*//' | tr -d ' ')
+BRANCH=$(awk '/^## 実行メタデータ/,/^### フェーズチェックリスト/' "$PLAN_FILE" | grep "^\- \*\*ブランチ\*\*:" | sed 's/.*ブランチ\*\*:\s*//' | tr -d ' ')
 
 echo "Plan file: $PLAN_FILE"
 echo "State: $STATE"
@@ -336,8 +341,9 @@ if [ "$STATE" = "pending" ]; then
   echo "State updated: in-progress"
 fi
 
-# 7. フェーズを順次実行
-for PHASE_NUM in $(seq $START_PHASE 4); do
+# 7. フェーズを順次実行（フェーズ数を動的に取得）
+MAX_PHASE=$(grep -c "^### Phase " "$PLAN_FILE")
+for PHASE_NUM in $(seq $START_PHASE $MAX_PHASE); do
   echo "=========================================="
   echo "Phase $PHASE_NUM"
   echo "=========================================="
@@ -397,11 +403,16 @@ sed -i "s/^\- \*\*状態\*\*: .*/- **状態**: completed/" "$PLAN_FILE"
 
 # サマリー表示
 COMPLETED_PHASES=$(grep -c "^\- \[x\] Phase" "$PLAN_FILE")
-FILES_COUNT=$(grep "^\- \*\*変更ファイル\*\*:" "$PLAN_FILE" | sed 's/.*変更ファイル\*\*:\s*//' | grep -o ',' | wc -l)
-FILES_COUNT=$((FILES_COUNT + 1))
+FILES_STR=$(grep "^\- \*\*変更ファイル\*\*:" "$PLAN_FILE" | sed 's/.*変更ファイル\*\*:\s*//')
+if [ "$FILES_STR" = "[]" ]; then
+  FILES_COUNT=0
+else
+  FILES_COUNT=$(echo "$FILES_STR" | grep -o ',' | wc -l)
+  FILES_COUNT=$((FILES_COUNT + 1))
+fi
 
 echo "Summary:"
-echo "- Completed phases: $COMPLETED_PHASES / 4"
+echo "- Completed phases: $COMPLETED_PHASES / $MAX_PHASE"
 echo "- Files modified: $FILES_COUNT"
 echo ""
 echo "Next steps:"
