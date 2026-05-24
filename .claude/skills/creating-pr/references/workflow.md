@@ -29,8 +29,11 @@ git branch --show-current
 # トラッキングブランチの確認
 git rev-parse --abbrev-ref --symbolic-full-name @{u}
 
-# デフォルトブランチの確認
-git symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@'
+# デフォルトブランチの確認（origin/HEADが設定されている場合）
+git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@'
+
+# より確実な方法（origin/HEAD未設定でも動作）
+git remote show origin | grep 'HEAD branch' | cut -d' ' -f5
 
 # mainから分岐後のコミット一覧
 git log main..HEAD

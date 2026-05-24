@@ -34,7 +34,7 @@ tools: Read, Bash
    - 日本語または英語（変更内容に応じて適切な方を選択）
    - 必ず末尾に以下を追加：
      ```
-     Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+     Co-Authored-By: Claude Code <noreply@anthropic.com>
      ```
 
 3. **コミットを作成**：
@@ -43,7 +43,7 @@ tools: Read, Bash
    git commit -m "$(cat <<'EOF'
    <コミットメッセージ本文>
 
-   Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+   Co-Authored-By: Claude Code <noreply@anthropic.com>
    EOF
    )"
    ```
@@ -84,7 +84,8 @@ tools: Read, Bash
 ### Phase 4: プッシュとPR作成
 
 1. **リモートブランチの確認**：
-   - `git rev-parse --abbrev-ref --symbolic-full-name @{u}` でトラッキングブランチを確認
+   - `git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null` でトラッキングブランチを確認（エラー出力を抑制）
+   - 終了ステータスが非0の場合、トラッキングブランチは存在しない
    - 存在しない場合は `-u` オプション付きでプッシュ
 
 2. **プッシュ実行**：
@@ -147,7 +148,7 @@ tools: Read, Bash
 - プロジェクトによって異なる場合は、`git symbolic-ref refs/remotes/origin/HEAD` で確認
 
 ### Co-Authored-By タグ
-- **必須**: 全てのコミットに `Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>` を追加
+- **必須**: 全てのコミットに `Co-Authored-By: Claude Code <noreply@anthropic.com>` を追加
 - Claude Codeが生成したコミットであることを明示
 
 ## 使用例
