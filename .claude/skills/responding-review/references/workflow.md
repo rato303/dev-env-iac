@@ -432,8 +432,293 @@ gh api repos/{owner}/{repo}/pulls/8/comments/3294158924/replies \
 - [GitHub API: Update a review comment](https://docs.github.com/en/rest/pulls/comments#update-a-review-comment)
 - 実際の失敗事例: [PR #8 コメント #3294158924](https://github.com/rato303/dev-env-iac/pull/8#discussion_r3294158924), [#3294158925](https://github.com/rato303/dev-env-iac/pull/8#discussion_r3294158925)
 
+## レビューコメントのResolve
+
+### 概要
+
+レビューコメントへの返信投稿後、GitHub GraphQL APIを使用してスレッドを自動的にResolveします。これにより、レビュー対応が完了したことを明示的に示します。
+
+### thread IDの取得
+
+レビューコメントに対応するthread ID（node ID）を取得します。
+
+```bash
+# GraphQL APIでthread IDを取得
+get_thread_ids() {
+  local owner="$1"
+  local repo="$2"
+  local pr_number="$3"
+  
+  gh api graphql -f owner="$owner" -f repo="$repo" -F pr="$pr_number" -f query='
+    query($owner: String!, $repo: String!, $pr: Int!) {
+      repository(owner: $owner, name: $repo) {
+        pullRequest(number: $pr) {
+          reviewThreads(first: 20) {
+            nodes {
+              id
+              isResolved
+              comments(first: 1) {
+                nodes {
+                  databaseId
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  '
+}
+
+# 実行例
+get_thread_ids rato303 dev-env-iac 12
+```
+
+**出力例**:
+```json
+{
+  "data": {
+    "repository": {
+      "pullRequest": {
+        "reviewThreads": {
+          "nodes": [
+            {
+              "id": "PRRT_kwDOSmRLpM6EX0KY",
+              "isResolved": false,
+              "comments": {
+                "nodes": [
+                  {
+                    "databaseId": 3294272425
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
+```
+
+### thread IDとcomment IDのマッピング
+
+```bash
+# comment ID (database ID) から thread ID (node ID) を取得
+map_comment_to_thread() {
+  local comment_id="$1"
+  local threads_json="$2"
+  
+  echo "$threads_json" | jq -r --arg cid "$comment_id" '
+    .data.repository.pullRequest.reviewThreads.nodes[] |
+    select(.comments.nodes[0].databaseId == ($cid | tonumber)) |
+    .id
+  '
+}
+
+# 使用例
+THREADS_JSON=$(get_thread_ids rato303 dev-env-iac 12)
+THREAD_ID=$(map_comment_to_thread 3294272425 "$THREADS_JSON")
+echo "Thread ID: $THREAD_ID"
+```
+
+### スレッドのResolve
+
+```bash
+# GraphQL mutation でスレッドをResolve
+resolve_thread() {
+  local thread_id="$1"
+  
+  gh api graphql -f query="
+    mutation {
+      resolveReviewThread(input: {threadId: \"$thread_id\"}) {
+        thread {
+          id
+          isResolved
+        }
+      }
+    }
+  "
+  
+  if [ $? -eq 0 ]; then
+    echo "Thread $thread_id resolved successfully"
+    return 0
+  else
+    echo "Failed to resolve thread $thread_id"
+    return 1
+  fi
+}
+
+# 使用例
+resolve_thread "PRRT_kwDOSmRLpM6EX0KY"
+```
+
+**出力例**:
+```json
+{
+  "data": {
+    "resolveReviewThread": {
+      "thread": {
+        "id": "PRRT_kwDOSmRLpM6EX0KY",
+        "isResolved": true
+      }
+    }
+  }
+}
+```
+
+### 統合フロー: 返信 + Resolve
+
+```bash
+#!/bin/bash
+
+# 設定
+OWNER="rato303"
+REPO="dev-env-iac"
+PR_NUMBER=12
+COMMENT_IDS=(3294272425 3294272429 3294272431 3294272432)
+
+# 1. thread ID一覧を取得
+THREADS_JSON=$(gh api graphql -f owner="$OWNER" -f repo="$REPO" -F pr="$PR_NUMBER" -f query='
+  query($owner: String!, $repo: String!, $pr: Int!) {
+    repository(owner: $owner, name: $repo) {
+      pullRequest(number: $pr) {
+        reviewThreads(first: 20) {
+          nodes {
+            id
+            isResolved
+            comments(first: 1) {
+              nodes {
+                databaseId
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+')
+
+# 2. 各コメントに返信 + Resolve
+COMMIT_HASH=$(git log -1 --format=%H)
+RESOLVED_COUNT=0
+FAILED_COUNT=0
+
+for COMMENT_ID in "${COMMENT_IDS[@]}"; do
+  echo "Processing comment $COMMENT_ID..."
+  
+  # 返信投稿
+  gh api repos/$OWNER/$REPO/pulls/$PR_NUMBER/comments/$COMMENT_ID/replies \
+    -f body="ご指摘ありがとうございます。
+
+対応しました。
+
+対応コミット: $COMMIT_HASH"
+  
+  if [ $? -eq 0 ]; then
+    echo "  Reply posted successfully"
+    
+    # thread IDを取得
+    THREAD_ID=$(echo "$THREADS_JSON" | jq -r --arg cid "$COMMENT_ID" '
+      .data.repository.pullRequest.reviewThreads.nodes[] |
+      select(.comments.nodes[0].databaseId == ($cid | tonumber)) |
+      .id
+    ')
+    
+    if [ -n "$THREAD_ID" ]; then
+      # Resolve実行
+      gh api graphql -f query="
+        mutation {
+          resolveReviewThread(input: {threadId: \"$THREAD_ID\"}) {
+            thread {
+              id
+              isResolved
+            }
+          }
+        }
+      " >/dev/null 2>&1
+      
+      if [ $? -eq 0 ]; then
+        echo "  Thread resolved successfully"
+        RESOLVED_COUNT=$((RESOLVED_COUNT + 1))
+      else
+        echo "  Failed to resolve thread"
+        FAILED_COUNT=$((FAILED_COUNT + 1))
+      fi
+    else
+      echo "  Thread ID not found"
+      FAILED_COUNT=$((FAILED_COUNT + 1))
+    fi
+  else
+    echo "  Failed to post reply"
+    FAILED_COUNT=$((FAILED_COUNT + 1))
+  fi
+  
+  echo ""
+done
+
+# 3. サマリー表示
+echo "=========================================="
+echo "Review response completed"
+echo "=========================================="
+echo "Comments replied: ${#COMMENT_IDS[@]}"
+echo "Threads resolved: $RESOLVED_COUNT"
+echo "Failed: $FAILED_COUNT"
+echo ""
+echo "PR URL: https://github.com/$OWNER/$REPO/pull/$PR_NUMBER"
+```
+
+### エラーハンドリング
+
+#### Resolve権限がない場合
+
+**症状**: `resolveReviewThread` mutation がエラーを返す
+
+**原因**: PRの所有者またはコラボレーターのみがResolve可能
+
+**対策**:
+```bash
+# エラー時でも処理を継続
+resolve_thread "$THREAD_ID" 2>/dev/null || {
+  echo "Warning: Failed to resolve thread $THREAD_ID (permission denied?)"
+  # 処理を継続
+}
+```
+
+#### 既にResolve済みの場合
+
+**症状**: `isResolved: true` のスレッドに再度Resolveを実行
+
+**対策**: Resolveは冪等（何度実行しても同じ結果）なので、特別な処理は不要
+
+```bash
+# 既にResolveされている場合もエラーにはならない
+resolve_thread "$THREAD_ID"  # 常に成功
+```
+
+#### thread IDが見つからない場合
+
+**症状**: comment IDに対応するthread IDが存在しない
+
+**原因**: レビューコメントではなく、通常のPRコメントの可能性
+
+**対策**:
+```bash
+if [ -z "$THREAD_ID" ]; then
+  echo "Warning: Thread ID not found for comment $COMMENT_ID"
+  echo "This may be a regular PR comment, not a review comment"
+  continue
+fi
+```
+
+### 参考リンク
+
+- [GitHub GraphQL API: resolveReviewThread](https://docs.github.com/en/graphql/reference/mutations#resolvereviewthread)
+- [GitHub GraphQL API: PullRequestReviewThread](https://docs.github.com/en/graphql/reference/objects#pullrequestreviewthread)
+
 ## 関連リンク
 
 - [GitHub CLI マニュアル](https://cli.github.com/manual/)
 - [GitHub REST API - Pulls](https://docs.github.com/en/rest/pulls)
+- [GitHub GraphQL API](https://docs.github.com/en/graphql)
 - [Git 公式ドキュメント](https://git-scm.com/doc)

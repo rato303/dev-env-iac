@@ -88,9 +88,46 @@ tools: Read, Bash, Edit
    対応コミット: <commit-hash>"
    ```
 
-3. **返信完了確認**：
+3. **レビューコメントのResolve**：
+   ```bash
+   # thread IDを取得
+   gh api graphql -f owner={owner} -f repo={repo} -F pr={PR番号} -f query='
+     query($owner: String!, $repo: String!, $pr: Int!) {
+       repository(owner: $owner, name: $repo) {
+         pullRequest(number: $pr) {
+           reviewThreads(first: 10) {
+             nodes {
+               id
+               isResolved
+               comments(first: 1) {
+                 nodes {
+                   databaseId
+                 }
+               }
+             }
+           }
+         }
+       }
+     }
+   '
+   
+   # 各スレッドをResolve
+   gh api graphql -f query='
+     mutation {
+       resolveReviewThread(input: {threadId: "<thread_id>"}) {
+         thread {
+           id
+           isResolved
+         }
+       }
+     }
+   '
+   ```
+
+4. **返信完了確認**：
    - 各コメントに返信が投稿されたことを確認
-   - ユーザーに「レビュー対応完了: <PR URL>」と報告
+   - 各スレッドがResolveされたことを確認
+   - ユーザーに「レビュー対応完了: <数>件返信、<数>件Resolve」と報告
 
 ## エラーハンドリング
 
@@ -163,6 +200,24 @@ PRのheadRefNameと現在のブランチ名を比較
 - GitHub CLI の認証が切れている（gh auth login で再認証）
 - コメントが既に削除されている
 - ネットワークエラー
+```
+
+### Resolve権限エラー
+
+**検出方法**:
+`gh api graphql` で `resolveReviewThread` mutation が非ゼロで終了
+
+**エラーメッセージ**:
+```
+レビューコメントのResolveに失敗しました。
+Thread ID: <thread_id>
+
+考えられる原因:
+- Resolve権限がない（PRオーナーまたはコラボレーターのみ）
+- スレッドが既に削除されている
+- GitHub API エラー
+
+返信は正常に投稿されました。スレッドは手動でResolveしてください。
 ```
 
 ## 使用例
