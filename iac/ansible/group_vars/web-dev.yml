@@ -1,0 +1,15 @@
+---
+# Web開発ツールチェーン用変数
+
+# NVM設定
+nvm_version: "0.39.7"
+nvm_node_versions:
+  - lts
+nvm_default_version: lts
+nvm_global_packages:
+  - "@anthropic-ai/claude-code"
+  - typescript
+  - ts-node
+
+# Docker設定（共通ロールで使用）
+docker_compose_version: "latest"

@@ -1,0 +1,28 @@
+# デフォルト設定
+
+# AWS設定
+aws:
+  region: ap-northeast-1
+
+# EC2インスタンス設定
+ec2:
+  instance_type: t3.medium
+  volume_size: 60
+  ami_type: ubuntu-24.04  # Ubuntu 24.04 LTS (Noble)
+
+# タグ設定
+tags:
+  managed_by: dev-env-iac
+  provisioned_by: pulumi
+
+# 自動停止設定
+auto_shutdown:
+  enabled: true
+  time: "22:00"
+  days: "Mon-Fri"
+
+# IAMロール設定
+iam:
+  default_role: basic  # basic または super
+  basic_role_name: WebBasicDeveloper
+  super_role_name: WebSuperDeveloper

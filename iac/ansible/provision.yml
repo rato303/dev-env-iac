@@ -1,0 +1,61 @@
+---
+# Development environment provisioning playbook
+# Supports multiple toolchains: web-dev, jvm-dev
+
+- name: Setup development environment
+  hosts: all
+  become: yes
+
+  vars:
+    # デフォルトはweb-dev（コマンドラインで上書き可能）
+    toolchain: "{{ toolchain | default('web-dev') }}"
+
+  tasks:
+    - name: Display toolchain
+      debug:
+        msg: "Provisioning for toolchain: {{ toolchain }}"
+
+    # 共通ロール（全環境で必須）
+    - name: Include common roles
+      include_role:
+        name: "common/{{ item }}"
+      loop:
+        - awscli
+        - make
+        - docker
+        - ansible
+        - git-switch-user
+
+    # Web開発ツールチェーン
+    - name: Include web-dev roles
+      include_role:
+        name: "web-dev/{{ item }}"
+      loop:
+        - nvm
+        - pulumi
+      when: toolchain == 'web-dev'
+
+    # JVM開発ツールチェーン
+    - name: Include jvm-dev roles
+      include_role:
+        name: "jvm-dev/{{ item }}"
+      loop:
+        - sdkman
+      when: toolchain == 'jvm-dev'
+
+    # 両方のツールチェーン（allオプション）
+    - name: Include all toolchain roles
+      block:
+        - name: Include web-dev roles
+          include_role:
+            name: "web-dev/{{ item }}"
+          loop:
+            - nvm
+            - pulumi
+
+        - name: Include jvm-dev roles
+          include_role:
+            name: "jvm-dev/{{ item }}"
+          loop:
+            - sdkman
+      when: toolchain == 'all'

@@ -1,0 +1,31 @@
+# プロジェクト定義
+# 各案件の設定を記述します
+
+projects:
+  # サンプルプロジェクト（テンプレート用）
+  template:
+    name: "Template Project"
+    description: "新規プロジェクトのテンプレート"
+    environments:
+      - dev
+    toolchain: web-dev
+    cost_center: "template"
+    owner: "admin@example.com"
+    # 注意: vpc_id と subnet_id は実際の値に置き換えてください
+    vpc_id: "vpc-xxxxxxxxx"
+    subnet_id: "subnet-xxxxxxxxx"
+
+# 新規プロジェクトを追加する例:
+#
+# client-a:
+#   name: "Client A Project"
+#   description: "クライアントA向け開発環境"
+#   environments:
+#     - dev
+#     - staging
+#     - prod
+#   toolchain: web-dev        # web-dev または jvm-dev
+#   cost_center: "client-a"
+#   owner: "user@example.com"
+#   vpc_id: "vpc-xxxxxxxxx"   # 共有VPC ID
+#   subnet_id: "subnet-xxxxxxxxx"  # 共有Subnet ID

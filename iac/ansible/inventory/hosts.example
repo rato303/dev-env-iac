@@ -1,0 +1,19 @@
+# Ansible Inventory Example for Session Manager
+# PulumiでプロビジョニングしたEC2インスタンスのIDを指定してください
+
+[targets]
+# EC2インスタンスID（pulumi stack output instanceIdで取得）
+# 例: i-0123456789abcdef0
+YOUR_EC2_INSTANCE_ID
+
+# 複数のホストを追加する場合:
+# i-0123456789abcdef1
+# i-0123456789abcdef2
+
+[targets:vars]
+# Session Manager接続設定
+ansible_connection=aws_ssm
+ansible_aws_ssm_region=ap-northeast-1
+ansible_python_interpreter=/usr/bin/python3
+
+# SSHポート転送などの設定は不要（Session Manager経由）

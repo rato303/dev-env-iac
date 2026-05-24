@@ -1,0 +1,42 @@
+# Pulumi
+Pulumi.*.yaml
+!Pulumi.*.yaml.example
+.pulumi/
+node_modules/
+bin/
+
+# Ansible
+*.retry
+.ansible/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Secrets
+*.pem
+*.key
+secrets/
+
+# Terraform (if used)
+.terraform/
+*.tfstate
+*.tfstate.backup

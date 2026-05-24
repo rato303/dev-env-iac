@@ -1,0 +1,14 @@
+---
+# JVM開発ツールチェーン用変数
+
+# SDKMAN設定
+sdkman_version: "latest"
+sdkman_sdks:
+  - name: java
+    version: latest
+  - name: kotlin
+    version: latest
+  - name: gradle
+    version: latest
+
+sdkman_set_default: true
