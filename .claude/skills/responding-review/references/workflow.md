@@ -453,11 +453,11 @@ get_thread_ids() {
     query($owner: String!, $repo: String!, $pr: Int!) {
       repository(owner: $owner, name: $repo) {
         pullRequest(number: $pr) {
-          reviewThreads(first: 20) {
+          reviewThreads(first: 50) {
             nodes {
               id
               isResolved
-              comments(first: 1) {
+              comments(first: 10) {
                 nodes {
                   databaseId
                 }
@@ -511,7 +511,7 @@ map_comment_to_thread() {
   
   echo "$threads_json" | jq -r --arg cid "$comment_id" '
     .data.repository.pullRequest.reviewThreads.nodes[] |
-    select(.comments.nodes[0].databaseId == ($cid | tonumber)) |
+    select(.comments.nodes[].databaseId == ($cid | tonumber)) |
     .id
   '
 }
@@ -529,16 +529,16 @@ echo "Thread ID: $THREAD_ID"
 resolve_thread() {
   local thread_id="$1"
   
-  gh api graphql -f query="
-    mutation {
-      resolveReviewThread(input: {threadId: \"$thread_id\"}) {
+  gh api graphql -f id="$thread_id" -f query='
+    mutation($id: ID!) {
+      resolveReviewThread(input: {threadId: $id}) {
         thread {
           id
           isResolved
         }
       }
     }
-  "
+  '
   
   if [ $? -eq 0 ]; then
     echo "Thread $thread_id resolved successfully"
@@ -583,11 +583,11 @@ THREADS_JSON=$(gh api graphql -f owner="$OWNER" -f repo="$REPO" -F pr="$PR_NUMBE
   query($owner: String!, $repo: String!, $pr: Int!) {
     repository(owner: $owner, name: $repo) {
       pullRequest(number: $pr) {
-        reviewThreads(first: 20) {
+        reviewThreads(first: 50) {
           nodes {
             id
             isResolved
-            comments(first: 1) {
+            comments(first: 10) {
               nodes {
                 databaseId
               }
@@ -621,22 +621,22 @@ for COMMENT_ID in "${COMMENT_IDS[@]}"; do
     # thread IDを取得
     THREAD_ID=$(echo "$THREADS_JSON" | jq -r --arg cid "$COMMENT_ID" '
       .data.repository.pullRequest.reviewThreads.nodes[] |
-      select(.comments.nodes[0].databaseId == ($cid | tonumber)) |
+      select(.comments.nodes[].databaseId == ($cid | tonumber)) |
       .id
     ')
     
     if [ -n "$THREAD_ID" ]; then
       # Resolve実行
-      gh api graphql -f query="
-        mutation {
-          resolveReviewThread(input: {threadId: \"$THREAD_ID\"}) {
+      gh api graphql -f id="$THREAD_ID" -f query='
+        mutation($id: ID!) {
+          resolveReviewThread(input: {threadId: $id}) {
             thread {
               id
               isResolved
             }
           }
         }
-      " >/dev/null 2>&1
+      ' >/dev/null 2>&1
       
       if [ $? -eq 0 ]; then
         echo "  Thread resolved successfully"

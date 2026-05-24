@@ -95,11 +95,11 @@ tools: Read, Bash, Edit
      query($owner: String!, $repo: String!, $pr: Int!) {
        repository(owner: $owner, name: $repo) {
          pullRequest(number: $pr) {
-           reviewThreads(first: 10) {
+           reviewThreads(first: 50) {
              nodes {
                id
                isResolved
-               comments(first: 1) {
+               comments(first: 10) {
                  nodes {
                    databaseId
                  }
@@ -112,9 +112,9 @@ tools: Read, Bash, Edit
    '
    
    # 各スレッドをResolve
-   gh api graphql -f query='
-     mutation {
-       resolveReviewThread(input: {threadId: "<thread_id>"}) {
+   gh api graphql -f id="<thread_id>" -f query='
+     mutation($id: ID!) {
+       resolveReviewThread(input: {threadId: $id}) {
          thread {
            id
            isResolved
