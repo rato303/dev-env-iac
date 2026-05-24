@@ -23,13 +23,29 @@ export function createProjectSecurityGroup(
         vpcId: vpcId,
 
         // アウトバウンド: 443のみ
-        egress: [{
-            fromPort: 443,
-            toPort: 443,
-            protocol: "tcp",
-            cidrBlocks: ["0.0.0.0/0"],
-            description: "HTTPS for Session Manager and package downloads"
-        }],
+        egress: [
+            {
+                fromPort: 443,
+                toPort: 443,
+                protocol: "tcp",
+                cidrBlocks: ["0.0.0.0/0"],
+                description: "HTTPS for Session Manager and package downloads"
+            },
+            {
+                fromPort: 53,
+                toPort: 53,
+                protocol: "udp",
+                cidrBlocks: ["0.0.0.0/0"],
+                description: "DNS lookup"
+            },
+            {
+                fromPort: 53,
+                toPort: 53,
+                protocol: "tcp",
+                cidrBlocks: ["0.0.0.0/0"],
+                description: "DNS lookup"
+            }
+        ],
 
         tags: {
             Name: `${projectName}-${environment}-dev-sg`,
