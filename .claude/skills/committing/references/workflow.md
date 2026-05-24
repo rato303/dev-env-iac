@@ -85,10 +85,10 @@ git log -1
 # 変更ファイルを取得
 STAGED_FILES=$(git diff --staged --name-only)
 UNSTAGED_FILES=$(git diff --name-only)
-ALL_FILES="${STAGED_FILES}${UNSTAGED_FILES}"
+ALL_FILES=$(printf "%s\n%s" "$STAGED_FILES" "$UNSTAGED_FILES")
 
 # 新規ファイルの判定
-NEW_FILES=$(git status --short | grep '^??' | awk '{print $2}')
+NEW_FILES=$(git status --short | grep '^??' | cut -c 4-)
 
 # プレフィックス判定
 PREFIX=""
@@ -157,7 +157,9 @@ FILES=$(git diff --staged --name-only)
 
 # 各ファイルの変更内容をサマリー化
 BODY=""
-for FILE in $FILES; do
+while read -r FILE; do
+  [ -z "$FILE" ] && continue
+  
   # ファイル名
   FILENAME=$(basename "$FILE")
   
@@ -166,15 +168,15 @@ for FILE in $FILES; do
   
   # 簡易的な変更内容判定
   if git diff --staged "$FILE" | grep -q '^+++.*'; then
-    CHANGE="新規作成"
+    CHANGE="新規作成 ($STATS)"
   elif [ $(git diff --staged --numstat "$FILE" | awk '{print $1-$2}') -gt 0 ]; then
-    CHANGE="機能追加"
+    CHANGE="機能追加 ($STATS)"
   else
-    CHANGE="修正"
+    CHANGE="修正 ($STATS)"
   fi
   
   BODY="${BODY}- ${FILENAME}: ${CHANGE}\n"
-done
+done <<< "$FILES"
 
 echo -e "$BODY"
 ```
@@ -197,7 +199,7 @@ BODY=$(generate_body)
 CO_AUTHORED="Co-Authored-By: Claude Code <noreply@anthropic.com>"
 
 # 5. 完全なメッセージ構築
-COMMIT_MESSAGE="${PREFIX}: ${SUMMARY}
+COMMIT_MESSAGE="${SUMMARY}
 
 ${BODY}
 
